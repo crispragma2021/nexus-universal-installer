@@ -1,0 +1,106 @@
+#!/bin/bash
+# ============================================
+# NEXUS Universal Installer - Human Virtual Synergy
+# Repositorio: https://github.com/crispragma2021
+# ============================================
+
+REAL_USER=$(whoami)
+HOME_DIR="/home/$REAL_USER"
+
+detect_system() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        echo "$ID"
+    else
+        echo "unknown"
+    fi
+}
+SYS_TYPE=$(detect_system)
+
+if ! command -v zenity &> /dev/null; then
+    echo "⚙️ Instalando zenity..."
+    if command -v apt-get &>/dev/null; then
+        pkexec bash -c "apt-get update -y && apt-get install -y zenity" 2>/dev/null
+    elif command -v pacman &>/dev/null; then
+        pkexec pacman -S --noconfirm zenity 2>/dev/null
+    elif command -v dnf &>/dev/null; then
+        pkexec dnf install -y zenity 2>/dev/null
+    fi
+fi
+
+installer_mode() {
+    local filter="Paquetes Linux | *.deb *.rpm *.zst *.pkg.tar.zst *.appimage"
+    local pkg_file=$(zenity --file-selection --title="📦 NEXUS - Instalar" --file-filter="$filter" --filename="$HOME_DIR/Descargas/" 2>/dev/null)
+    [ -z "$pkg_file" ] && return 0
+    local pkg_name=$(basename "$pkg_file")
+    
+    zenity --question --title="Confirmar Instalación" --text="¿Instalar <b>$pkg_name</b> en $SYS_TYPE?" --width=400 2>/dev/null || return 0
+    
+    ( echo "10"; echo "# Verificando dependencias..."; sleep 1
+      echo "30"; echo "# Instalando $pkg_name..."
+      if command -v apt-get &>/dev/null; then
+          pkexec bash -c "dpkg -i '$pkg_file' 2>/dev/null; apt-get install -f -y 2>/dev/null"
+      elif command -v pacman &>/dev/null; then
+          pkexec pacman -U --noconfirm "$pkg_file" 2>/dev/null
+      elif command -v dnf &>/dev/null; then
+          pkexec dnf install -y "$pkg_file" 2>/dev/null
+      fi
+      echo "80"; echo "# Limpiando..."; sleep 1
+      echo "100"; echo "# Completado!"
+    ) | zenity --progress --title="NEXUS Installer" --text="Instalando..." --percentage=0 --auto-close --width=400 2>/dev/null
+    
+    zenity --info --text="✅ $pkg_name instalado correctamente" --timeout=3 2>/dev/null
+}
+
+uninstaller_mode() {
+    local packages=""
+    case $SYS_TYPE in
+        *ubuntu*|*debian*)
+            packages=$(dpkg-query -W -f='${Package}\n' | grep -E "chrome|chromium|code|cursor|vlc|steam|discord|spotify|telegram|firefox|gimp" | sort | uniq | head -40)
+            ;;
+        *arch*)
+            packages=$(pacman -Qqe | grep -E "chrome|chromium|code|cursor|vlc|steam|discord|spotify" | sort | uniq | head -40)
+            ;;
+        *fedora*)
+            packages=$(rpm -qa --qf '%{NAME}\n' | grep -E "chrome|chromium|code|vlc|steam|discord" | sort | uniq | head -40)
+            ;;
+    esac
+    [ -z "$packages" ] && packages="Ningún paquete detectado"
+    
+    local selected=$(echo "$packages" | zenity --list --title="🗑️ NEXUS - Desinstalar" --text="Selecciona el programa a eliminar:" --column="Paquetes Detectados" --width=500 --height=400 --hide-header 2>/dev/null)
+    [ -z "$selected" ] || [[ "$selected" == *"Ningún paquete"* ]] && return 0
+    
+    zenity --question --title="⚠️ Confirmar Eliminación" --text="¿Eliminar permanentemente <b>$selected</b>?" --width=400 2>/dev/null || return 0
+    
+    ( echo "20"; echo "# Buscando dependencias..."; sleep 1
+      echo "50"; echo "# Eliminando $selected..."
+      if command -v apt-get &>/dev/null; then
+          pkexec bash -c "apt-get purge -y '$selected' && apt-get autoremove -y 2>/dev/null"
+      elif command -v pacman &>/dev/null; then
+          pkexec pacman -Rns --noconfirm "$selected" 2>/dev/null
+      elif command -v dnf &>/dev/null; then
+          pkexec dnf remove -y "$selected" 2>/dev/null
+      fi
+      echo "90"; echo "# Limpiando residuos..."; sleep 1
+      echo "100"; echo "# Completado!"
+    ) | zenity --progress --title="NEXUS Uninstaller" --text="Eliminando..." --percentage=0 --auto-close --width=400 2>/dev/null
+    
+    zenity --info --text="✅ $selected eliminado correctamente" --timeout=3 2>/dev/null
+}
+
+info_mode() {
+    zenity --info --title="ℹ️ NEXUS - Información" --text="<b>NEXUS - Human Virtual Synergy</b>\n\n📌 Versión: 1.2.0\n🔗 Repositorio: https://github.com/crispragma2021\n👤 Desarrollador: crispragma2021\n📦 Formatos soportados: .deb, .rpm, .zst, .appimage\n\n<small>Instalador y desinstalador universal</small>" --width=450 2>/dev/null
+}
+
+show_menu() {
+    local choice=$(zenity --list --title="🧠 NEXUS Universal Installer" --text="<big><b>Human Virtual Synergy</b></big>\n\nSistema: $SYS_TYPE" --column="Acción" --column="Descripción" "📦 Instalar" "Instalar un paquete en el sistema" "🗑️ Desinstalar" "Eliminar un programa instalado" "ℹ️ Info" "Repositorio oficial: crispragma2021" --width=550 --height=300 2>/dev/null)
+    
+    case "$choice" in
+        "📦 Instalar") installer_mode ;;
+        "🗑️ Desinstalar") uninstaller_mode ;;
+        "ℹ️ Info") info_mode ;;
+        *) exit 0 ;;
+    esac
+}
+
+show_menu
