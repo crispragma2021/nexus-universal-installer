@@ -1,98 +1,152 @@
 #!/bin/bash
+# ============================================
+# NEXUS - Human Virtual Synergy
+# Repositorio: https://github.com/crispragma2021
+# ============================================
 
-# 1. DETECCIÓN DINÁMICA DEL USUARIO REAL (Universal para cualquier PC)
 REAL_USER=$(whoami)
+HOME_DIR="/home/$REAL_USER"
 
-# 2. DETECCIÓN AUTOMÁTICA DEL SISTEMA OPERATIVO
-if [ -f /etc/os-release ]; then
-    . /etc/os-release
-    DISTRO=$ID
-    LIKE=$ID_LIKE
-else
-    DISTRO="unknown"
-fi
-
-if [[ "$DISTRO" == "ubuntu" || "$DISTRO" == "debian" || "$LIKE" == *"debian"* || "$LIKE" == *"ubuntu"* ]]; then
-    SYS_TYPE="debian"
-    EXT="*.deb"
-elif [[ "$DISTRO" == "arch" || "$LIKE" == *"arch"* ]]; then
-    SYS_TYPE="arch"
-    EXT="*.tar.zst"
-elif [[ "$DISTRO" == "fedora" || "$DISTRO" == "rhel" || "$DISTRO" == "centos" || "$LIKE" == *"rhel"* || "$LIKE" == *"fedora"* ]]; then
-    SYS_TYPE="fedora"
-    EXT="*.rpm"
-else
-    zenity --error --text="Sistema no compatible con el núcleo NEXUS." --title="Error"; exit 1
-fi
-
-# --- MODO DESINSTALADOR AUTOMÁTICO ---
-if [ "$1" == "--uninstall" ]; then
-    echo "# Cargando lista de aplicaciones..." | zenity --progress --title="NEXUS Uninstaller Universal" --text="Detectando sistema: $DISTRO..." --pulsate --auto-close --width=400 &
-    Z_PID=$!
-    if [ "$SYS_TYPE" == "debian" ]; then 
-        LISTA_PAQUETES=$(dpkg-query -W -f='${Package}\n' | grep -E "chrome|chromium|code|vlc|steam|discord|spotify" | sort | uniq)
-        if [ -z "$LISTA_PAQUETES" ]; then LISTA_PAQUETES=$(dpkg-query -W -f='${Package}\n' | head -n 50); fi
-    elif [ "$SYS_TYPE" == "arch" ]; then 
-        LISTA_PAQUETES=$(pacman -Qqe | grep -E "chrome|chromium|code|vlc|steam|discord|spotify" | sort | uniq)
-        if [ -z "$LISTA_PAQUETES" ]; then LISTA_PAQUETES=$(pacman -Qqe | head -n 50); fi
-    elif [ "$SYS_TYPE" == "fedora" ]; then 
-        LISTA_PAQUETES=$(rpm -qa --qf '%{NAME}\n' | grep -E "chrome|chromium|code|vlc|steam|discord|spotify" | sort | uniq)
-        if [ -z "$LISTA_PAQUETES" ]; then LISTA_PAQUETES=$(rpm -qa --qf '%{NAME}\n' | head -n 50); fi
+detect_system() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        echo "$ID"
+    else
+        echo "unknown"
     fi
-    kill $Z_PID 2>/dev/null
+}
+SYS_TYPE=$(detect_system)
+
+if ! command -v zenity &> /dev/null; then
+    echo "⚙️ Instalando zenity..."
+    if command -v apt-get &>/dev/null; then
+        pkexec bash -c "apt-get update -y && apt-get install -y zenity" 2>/dev/null
+    elif command -v pacman &>/dev/null; then
+        pkexec pacman -S --noconfirm zenity 2>/dev/null
+    elif command -v dnf &>/dev/null; then
+        pkexec dnf install -y zenity 2>/dev/null
+    fi
+fi
+
+installer_mode() {
+    local filter="Paquetes Linux | *.deb *.rpm *.zst *.pkg.tar.zst *.appimage"
+    local pkg_file=$(zenity --file-selection --title="📦 NEXUS - Instalar" --file-filter="$filter" --filename="$HOME_DIR/Descargas/" 2>/dev/null)
+    [ -z "$pkg_file" ] && return 0
+    local pkg_name=$(basename "$pkg_file")
     
-    PAQUETE=$(echo "$LISTA_PAQUETES" | zenity --list --title="Desinstalador Universal [$DISTRO]" --text="Selecciona el programa que deseas eliminar:" --column="Programas Detectados" --width=450 --height=400)
-    if [ -z "$PAQUETE" ]; then exit 0; fi
+    zenity --question --title="Confirmar Instalación" --text="¿Instalar <b>$pkg_name</b> en $SYS_TYPE?" --width=400 2>/dev/null || return 0
     
-    zenity --question --title="Confirmar" --text="¿Seguro que deseas eliminar $PAQUETE de tu sistema?" --width=350 || exit 0
-    pkexec true || exit 0
+    ( echo "10"; echo "# Verificando dependencias..."; sleep 1
+      echo "30"; echo "# Instalando $pkg_name..."
+      if command -v apt-get &>/dev/null; then
+          pkexec bash -c "dpkg -i '$pkg_file' 2>/dev/null; apt-get install -f -y 2>/dev/null"
+      elif command -v pacman &>/dev/null; then
+          pkexec pacman -U --noconfirm "$pkg_file" 2>/dev/null
+      elif command -v dnf &>/dev/null; then
+          pkexec dnf install -y "$pkg_file" 2>/dev/null
+      fi
+      echo "80"; echo "# Limpiando..."; sleep 1
+      echo "100"; echo "# Completado!"
+    ) | zenity --progress --title="NEXUS Installer" --text="Instalando..." --percentage=0 --auto-close --width=400 2>/dev/null
     
-    (
-        echo '30' ; echo '# Removiendo paquete y dependencias...'
-        if [ "$SYS_TYPE" == "debian" ]; then 
-            pkexec apt-get purge -y "$PAQUETE" >/dev/null 2>&1
-            pkexec apt-get autoremove -y >/dev/null 2>&1
-        elif [ "$SYS_TYPE" == "arch" ]; then 
-            pkexec pacman -Rns --noconfirm "$PAQUETE" >/dev/null 2>&1
-        elif [ "$SYS_TYPE" == "fedora" ]; then 
-            pkexec dnf remove -y "$PAQUETE" >/dev/null 2>&1
+    zenity --info --text="✅ $pkg_name instalado correctamente" --timeout=3 2>/dev/null
+}
+
+uninstaller_mode() {
+    local packages=""
+    case $SYS_TYPE in
+        *ubuntu*|*debian*)
+            packages=$(dpkg-query -W -f='${Package}\n' | grep -E "chrome|chromium|code|cursor|vlc|steam|discord|spotify|telegram|firefox|gimp" | sort | uniq | head -40)
+            ;;
+        *arch*)
+            packages=$(pacman -Qqe | grep -E "chrome|chromium|code|cursor|vlc|steam|discord|spotify" | sort | uniq | head -40)
+            ;;
+        *fedora*)
+            packages=$(rpm -qa --qf '%{NAME}\n' | grep -E "chrome|chromium|code|vlc|steam|discord" | sort | uniq | head -40)
+            ;;
+    esac
+    [ -z "$packages" ] && packages="Ningún paquete detectado"
+    
+    local selected=$(echo "$packages" | zenity --list --title="🗑️ NEXUS - Desinstalar" --text="Selecciona el programa a eliminar:" --column="Paquetes Detectados" --width=500 --height=400 --hide-header 2>/dev/null)
+    [ -z "$selected" ] || [[ "$selected" == *"Ningún paquete"* ]] && return 0
+    
+    zenity --question --title="⚠️ Confirmar Eliminación" --text="¿Eliminar permanentemente <b>$selected</b>?" --width=400 2>/dev/null || return 0
+    
+    ( echo "20"; echo "# Buscando dependencias..."; sleep 1
+      echo "50"; echo "# Eliminando $selected..."
+      if command -v apt-get &>/dev/null; then
+          pkexec bash -c "apt-get purge -y '$selected' && apt-get autoremove -y 2>/dev/null"
+      elif command -v pacman &>/dev/null; then
+          pkexec pacman -Rns --noconfirm "$selected" 2>/dev/null
+      elif command -v dnf &>/dev/null; then
+          pkexec dnf remove -y "$selected" 2>/dev/null
+      fi
+      echo "90"; echo "# Limpiando residuos..."; sleep 1
+      echo "100"; echo "# Completado!"
+    ) | zenity --progress --title="NEXUS Uninstaller" --text="Eliminando..." --percentage=0 --auto-close --width=400 2>/dev/null
+    
+    zenity --info --text="✅ $selected eliminado correctamente" --timeout=3 2>/dev/null
+}
+
+info_mode() {
+    zenity --info --title="ℹ️ NEXUS - Información" --text="<b>NEXUS - Human Virtual Synergy</b>\n\n📌 Versión: 1.0.0\n🔗 Repositorio: https://github.com/crispragma2021\n👤 Desarrollador: crispragma2021\n\n<small>Instalador y desinstalador universal</small>" --width=450 2>/dev/null
+}
+
+show_menu() {
+    local choice=$(zenity --list --title="🧠 NEXUS" --text="<big><b>Human Virtual Synergy</b></big>\n\nSistema: $SYS_TYPE" --column="Acción" --column="Descripción" "📦 Instalar" "Instalar un paquete en el sistema" "🗑️ Desinstalar" "Eliminar un programa instalado" "ℹ️ Info" "Repositorio oficial: crispragma2021" "❌ Salir" "Cerrar NEXUS" --width=550 --height=300 2>/dev/null)
+    
+    case "$choice" in
+        "📦 Instalar") installer_mode ;;
+        "🗑️ Desinstalar") uninstaller_mode ;;
+        "ℹ️ Info") info_mode ;;
+        "❌ Salir") exit 0 ;;
+        *) exit 0 ;;
+    esac
+}
+
+install_context_menu() {
+    mkdir -p "$HOME_DIR/.local/share/applications"
+    cat > "$HOME_DIR/.local/share/applications/nexus.desktop" << DESKTOP
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=NEXUS
+Comment=Instalar y desinstalar programas
+Exec=$HOME_DIR/Escritorio/NEXUS.Suite
+Icon=system-software-install
+Terminal=false
+Categories=System;
+Actions=install;uninstall;info;
+
+[Desktop Action install]
+Name=📦 Instalar
+Exec=$HOME_DIR/Escritorio/NEXUS.Suite --install
+Icon=package-install
+
+[Desktop Action uninstall]
+Name=🗑️ Desinstalar
+Exec=$HOME_DIR/Escritorio/NEXUS.Suite --uninstall
+Icon=package-remove
+
+[Desktop Action info]
+Name=ℹ️ Info
+Exec=$HOME_DIR/Escritorio/NEXUS.Suite --info
+Icon=help-about
+DESKTOP
+    chmod +x "$HOME_DIR/.local/share/applications/nexus.desktop"
+    update-desktop-database "$HOME_DIR/.local/share/applications/" 2>/dev/null
+    zenity --info --title="NEXUS" --text="✅ Menú contextual instalado\n\nClic derecho → NEXUS" --width=350 2>/dev/null
+}
+
+case "$1" in
+    --install) installer_mode ;;
+    --uninstall) uninstaller_mode ;;
+    --info) info_mode ;;
+    --install-context) install_context_menu ;;
+    *)
+        if [ ! -f "$HOME_DIR/.local/share/applications/nexus.desktop" ]; then
+            zenity --question --title="NEXUS" --text="¿Instalar menú contextual?\n\nClic derecho → NEXUS" --width=350 2>/dev/null && install_context_menu
         fi
-        echo '100' ; echo '# Operación completada.'
-    ) | zenity --progress --title="Desinstalador" --text="Removiendo $PAQUETE..." --percentage=0 --auto-close --width=450
-    
-    zenity --info --text="¡Eliminado correctamente!" --title="Éxito"; exit 0
-fi
-
-# --- MODO INSTALADOR INTERACTIVO ---
-if [ -z "$1" ]; then
-    DEB_FILE=$(zenity --file-selection --title="NEXUS Installer [$DISTRO] - Selecciona un paquete ($EXT)" --file-filter="Paquetes ($EXT) | $EXT" --filename="/home/$REAL_USER/Descargas/")
-    if [ -z "$DEB_FILE" ]; then exit 0; fi
-else 
-    DEB_FILE=$(realpath "$1")
-fi
-
-FILE_NAME=$(basename "$DEB_FILE")
-pkexec true || exit 0
-export DEB_FILE FILE_NAME
-
-(
-    echo "10" ; sleep 0.5; echo "# Analizando e instalando en entorno $DISTRO..."
-    if [ "$SYS_TYPE" == "debian" ]; then
-        pkexec apt-get install -y "$DEB_FILE" 2>&1 | while read -r line; do
-            if [[ "$line" == *"Seleccionando"* ]]; then echo "40"; fi
-            if [[ "$line" == *"Desempaquetando"* ]]; then echo "70"; fi
-            if [[ "$line" == *"Configurando"* ]]; then echo "95"; fi
-        done
-    elif [ "$SYS_TYPE" == "arch" ]; then 
-        pkexec pacman -U --noconfirm "$DEB_FILE" >/dev/null 2>&1
-    elif [ "$SYS_TYPE" == "fedora" ]; then 
-        pkexec dnf install -y "$DEB_FILE" >/dev/null 2>&1
-    fi
-    echo "100" ; echo "# Finalizado."
-) | zenity --progress --title="Instalador Universal NEXUS" --text="Instalando $FILE_NAME..." --percentage=0 --auto-close --width=450
-
-if [ ${PIPESTATUS[0]} -eq 0 ]; then 
-    zenity --info --text="¡$FILE_NAME instalado con éxito en $DISTRO!" --title="Éxito"
-else 
-    zenity --error --text="Error al instalar $FILE_NAME. Verifica que el archivo no esté corrupto." --title="Fallo"
-fi
+        show_menu
+        ;;
+esac
