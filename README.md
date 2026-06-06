@@ -1,29 +1,19 @@
-# 📦 Instalador Universal & Desinstalador Inteligente NEXUS
+# 🚀 Suite Universal NEXUS
 
-Un motor de gestión de software soberano, ligero y camaleónico diseñado para unificar la experiencia de instalación en entornos GNU/Linux bajo una interfaz puramente gráfica, rápida y eficiente.
+El orquestador definitivo y camaleónico para sistemas GNU/Linux. Diseñado con precisión y eficiencia para la gestión avanzada de entornos digitales.
 
----
+## ⚖️ Licencia Blindada
+Este proyecto está protegido bajo la licencia **GPLv3 (General Public License v3)**. Posees la libertad absoluta de usar, estudiar y compartir este software.
 
-## ⚡ Superpoderes del Sistema
+## 💬 Comunidad y Sugerencias
+¡La Suite NEXUS evoluciona con la comunidad! Si tienes sugerencias, ideas de optimización o quieres proponer mejoras:
+1. Dirígete a la pestaña de **Issues** en la parte superior de este repositorio.
+2. Haz clic en el botón verde **New Issue**.
+3. Deja tus comentarios detallados para que el Arquitecto pueda evaluarlos e implementarlos.
 
-* **🧬 Núcleo Camaleónico Multidistribución:** Detecta el ADN de tu sistema operativo en caliente. Es compatible de forma nativa con **Ubuntu/Debian** (`.deb`), **Arch Linux** (`.tar.zst`) y **Fedora/RHEL** (`.rpm`).
-* **🖱️ Control Total en 2 Clics:** Olvídate de la terminal para instalar paquetes de internet. Doble clic, una sola contraseña, y el motor inyecta el software con una barra de progreso en tiempo real.
-* **🗑️ Panel de Control Contextual (Clic Derecho):** Una acción integrada directamente en el menú de tu sistema gráfico. Haz clic derecho sobre el icono del instalador y despliega una lista automática interactiva para purgar programas y barrer residuos al instante.
-
----
-
-## 🛠️ Instalación Rápida
-
-Para desplegar la Suite NEXUS en cualquier computadora, simplemente descarga el archivo `setup.sh`, haz clic derecho para otorgarle permisos de ejecución y ejecútalo con doble clic.
-
----
-
-## ☕ Apoya el Desarrollo (Proyecto NEXUS)
-
-Este es un proyecto de software soberano e independiente enfocado en la orquestación avanzada de sistemas. Si esta herramienta te ha ahorrado tiempo o ha facilitado tu gestión de software, ¡considera apoyar mi trabajo con una donación!
-
-* **[¡Apóyame en Ko-fi! (Donación Rápida con PayPal/Tarjeta)](https://ko-fi.com/tu_usuario_nexus)**
-* **[Conviértete en Patrocinador en GitHub Sponsors](https://github.com/sponsors/crispragma2021)**
+## 💰 Respalda el Desarrollo Soberano
+Si este software te es de utilidad y deseas apoyar la infraestructura y la crianza de estas soluciones técnicas, puedes realizar una contribución voluntaria:
+* **Pasarela oficial de aportes:** [Donar en Ko-fi](https://ko-fi.com/nexusuniversal)
 
 ---
-*Desarrollado con visión, precisión y eficiencia por el Arquitecto del Proyecto NEXUS.*
+*Desarrollado con soberanía técnica desde el Silicio.*
